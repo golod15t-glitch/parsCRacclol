@@ -15,7 +15,7 @@ from aiogram.enums.parse_mode import ParseMode
 # ==================== НАСТРОЙКИ ====================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "0"))  # Преобразуем в число
-
+GOLDEN_KEY = os.getenv("GOLDEN_KEY")
 if not BOT_TOKEN or ADMIN_CHAT_ID == 0:
     raise ValueError("BOT_TOKEN и ADMIN_CHAT_ID должны быть установлены в переменных окружения!")
     
@@ -37,7 +37,7 @@ HEADERS = {
 }
 
 COOKIES = {
-    'golden_key': '2t5853ola0uv1fw7bazhvv6kru4xbxzl',
+    'golden_key': '{GOLDEN_KEY}',
     '_ym_uid': '1769628684270636036',
     '_ym_d': '1769628684',
     '_ga': 'GA1.1.1252175048.1769628684',
@@ -323,3 +323,4 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
