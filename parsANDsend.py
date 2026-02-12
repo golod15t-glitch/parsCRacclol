@@ -41,7 +41,7 @@ HEADERS = {
 }
 
 COOKIES = {
-    'golden_key': GOLDEN_KEY
+    'golden_key': GOLDEN_KEY,
     '_ym_uid': '1769628684270636036',
     '_ym_d': '1769628684',
     '_ga': 'GA1.1.1252175048.1769628684',
@@ -314,3 +314,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
