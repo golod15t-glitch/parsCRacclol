@@ -56,7 +56,7 @@ COOKIES = {
 MIN_CUPS = 700
 MAX_CUPS = 1300        
 MIN_PRICE = 10.0
-MAX_PRICE = 35.0
+MAX_PRICE = 20.0
 
 LOTS_URL = "https://funpay.com/lots/149/"
 SENT_IDS_FILE = "data/sent_ids.json"   # обязательно Volume /app/data
@@ -314,5 +314,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
