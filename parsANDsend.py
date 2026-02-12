@@ -13,9 +13,12 @@ from aiogram.types import Message
 from aiogram.enums.parse_mode import ParseMode
 
 # ==================== НАСТРОЙКИ ====================
-BOT_TOKEN = "8284702013:AAHsmBIL2--35AFVllYrmMEH1RppBhxehPc"          # токен телеграм-бота
-ADMIN_CHAT_ID = 8206605553                 # ваш chat_id (можно получить у @userinfobot)
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "0"))  # Преобразуем в число
 
+if not BOT_TOKEN or ADMIN_CHAT_ID == 0:
+    raise ValueError("BOT_TOKEN и ADMIN_CHAT_ID должны быть установлены в переменных окружения!")
+    
 # Куки и заголовки для авторизации на FunPay
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
@@ -318,4 +321,5 @@ async def main():
 
 
 if __name__ == "__main__":
+
     asyncio.run(main())
