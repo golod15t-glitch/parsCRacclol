@@ -15,8 +15,7 @@ from aiogram.enums.parse_mode import ParseMode
 # ==================== НАСТРОЙКИ ====================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID_STR = os.getenv("ADMIN_CHAT_ID")
-GOLDEN_KEY = os.getenv("GOLDEN_KEY")          # если не используете – удалите из COOKIES
-
+GOLDEN_KEY = os.getenv("GOLDEN_KEY")
 if not BOT_TOKEN or not ADMIN_CHAT_ID_STR:
     raise ValueError("BOT_TOKEN и ADMIN_CHAT_ID должны быть установлены в переменных окружения!")
 try:
@@ -24,6 +23,7 @@ try:
 except ValueError:
     raise ValueError(f"ADMIN_CHAT_ID должен быть числом, получено: {ADMIN_CHAT_ID_STR}")
 
+# Куки и заголовки для FunPay
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -41,7 +41,7 @@ HEADERS = {
 }
 
 COOKIES = {
-    # 'golden_key': GOLDEN_KEY,   # <-- !!! УДАЛИТЕ эту строку, если golden_key не нужен
+    'golden_key': GOLDEN_KEY
     '_ym_uid': '1769628684270636036',
     '_ym_d': '1769628684',
     '_ga': 'GA1.1.1252175048.1769628684',
@@ -52,14 +52,14 @@ COOKIES = {
     '_ga_STVL2Q8BNQ': 'GS2.1.s1770731468$o39$g1$t1770731469$j59$l0$h1604990623'
 }
 
+# Параметры фильтрации
 MIN_CUPS = 700
+MAX_CUPS = 1300        # ✅ новое ограничение сверху
 MIN_PRICE = 10.0
-MAX_PRICE = 20.0   # или 35.0, как вам удобнее
+MAX_PRICE = 20.0
 
 LOTS_URL = "https://funpay.com/lots/149/"
-
-# !!! ВАЖНО: путь должен быть внутри папки data (Volume на Railway)
-SENT_IDS_FILE = "data/sent_ids.json"
+SENT_IDS_FILE = "data/sent_ids.json"   # обязательно Volume /app/data
 # ===================================================
 
 @dataclass
@@ -126,21 +126,22 @@ class FunPayParser:
             auto = lot_tag.get('data-auto') == '1'
             promo = 'offer-promo' in lot_tag.get('class', '')
 
-            # !!! ИСПРАВЛЕНИЕ ПАРСИНГА ЦЕНЫ !!!
+            # ✅ ПРАВИЛЬНЫЙ ПАРСИНГ ЦЕНЫ
             price_div = lot_tag.find('div', class_='tc-price')
             if not price_div:
                 return None
-            # Берём текст первого вложенного div (там чисто цена)
+            # Берём ТОЛЬКО первый div внутри tc-price (там чистая цена)
             price_value_div = price_div.find('div')
             if price_value_div:
                 price_text = price_value_div.get_text(strip=True)
             else:
                 price_text = price_div.get_text(strip=True)
-            price_match = re.search(r'([\d.,]+)', price_text.replace(' ', ''))
-            if not price_match:
+            # Убираем все пробелы, оставляем цифры и точку
+            price_clean = re.sub(r'[^\d.,]', '', price_text).replace(',', '.')
+            try:
+                price = float(price_clean)
+            except ValueError:
                 return None
-            price_str = price_match.group(1).replace(',', '.')
-            price = float(price_str)
 
             desc_div = lot_tag.find('div', class_='tc-desc')
             if not desc_div:
@@ -179,9 +180,10 @@ class FunPayParser:
         return lots
 
     def filter_lots(self, lots: List[FunPayLot]) -> List[FunPayLot]:
+        """Фильтр: кубки 700-1300, цена 10-20 руб"""
         filtered = []
         for lot in lots:
-            if lot.cups >= MIN_CUPS and MIN_PRICE <= lot.price <= MAX_PRICE:
+            if MIN_CUPS <= lot.cups <= MAX_CUPS and MIN_PRICE <= lot.price <= MAX_PRICE:
                 filtered.append(lot)
         return filtered
 
@@ -195,7 +197,6 @@ class FunPayMonitor:
         self._stop_event: Optional[asyncio.Event] = None
         self.load_sent_ids()
 
-    # !!! СОЗДАЁМ ПАПКУ ПЕРЕД ЗАГРУЗКОЙ !!!
     def load_sent_ids(self):
         os.makedirs(os.path.dirname(SENT_IDS_FILE), exist_ok=True)
         if os.path.exists(SENT_IDS_FILE):
@@ -218,18 +219,20 @@ class FunPayMonitor:
         except Exception as e:
             print(f"Ошибка сохранения sent_ids: {e}")
 
-    # !!! ИСПРАВЛЕНИЕ ОСТАНОВКИ (через asyncio.Event) !!!
     async def start_monitoring(self, chat_id: int):
         self.is_running = True
         self._stop_event = asyncio.Event()
         await self.bot.send_message(chat_id, "✅ Мониторинг лотов FunPay запущен")
-        while not self._stop_event.is_set():
+        
+        while self.is_running and not self._stop_event.is_set():
             try:
                 html = self.parser.fetch_page(LOTS_URL)
                 if html:
                     all_lots = self.parser.get_all_lots(html)
                     good_lots = self.parser.filter_lots(all_lots)
                     for lot in good_lots:
+                        if self._stop_event.is_set():   # проверка перед отправкой
+                            break
                         if lot.offer_id not in self.sent_ids:
                             await self.bot.send_message(
                                 chat_id,
@@ -240,14 +243,15 @@ class FunPayMonitor:
                             self.sent_ids.add(lot.offer_id)
                             self.save_sent_ids()
                             await asyncio.sleep(1)
-                # Ждём 30 секунд, но можем быть прерваны событием остановки
+                # Ожидание с возможностью прерывания
                 await asyncio.wait_for(self._stop_event.wait(), timeout=30)
             except asyncio.TimeoutError:
-                continue  # время вышло — снова парсим
+                continue
             except Exception as e:
                 await self.bot.send_message(chat_id, f"⚠️ Ошибка в цикле парсинга:\n{e}")
                 print(f"Ошибка в цикле: {e}")
                 await asyncio.sleep(30)
+        
         self.is_running = False
         await self.bot.send_message(chat_id, "⏹ Мониторинг остановлен.")
 
@@ -303,6 +307,8 @@ async def cmd_status(message: Message):
 
 
 async def main():
+    # ✅ ОБЯЗАТЕЛЬНО удаляем старый вебхук, чтобы избежать конфликта
+    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
 
