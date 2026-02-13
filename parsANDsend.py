@@ -53,7 +53,7 @@ COOKIES = {
 
 # Параметры фильтрации
 MIN_CUPS = 700
-MAX_CUPS = 1300        
+MAX_CUPS = 1700        
 MIN_PRICE = 10.0
 MAX_PRICE = 20.0
 
@@ -313,6 +313,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
