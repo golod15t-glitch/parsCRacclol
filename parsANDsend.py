@@ -243,13 +243,13 @@ class FunPayMonitor:
                             self.save_sent_ids()
                             await asyncio.sleep(1)
                 # Ожидание с возможностью прерывания
-                await asyncio.wait_for(self._stop_event.wait(), timeout=30)
+                await asyncio.wait_for(self._stop_event.wait(), timeout=18)
             except asyncio.TimeoutError:
                 continue
             except Exception as e:
                 await self.bot.send_message(chat_id, f"⚠️ Ошибка в цикле парсинга:\n{e}")
                 print(f"Ошибка в цикле: {e}")
-                await asyncio.sleep(30)
+                await asyncio.sleep(18)
         
         self.is_running = False
         await self.bot.send_message(chat_id, "⏹ Мониторинг остановлен.")
@@ -313,6 +313,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
